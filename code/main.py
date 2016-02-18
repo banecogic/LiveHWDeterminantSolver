@@ -5,9 +5,9 @@ Spyder Editor
 This is a temporary script file.
 """
 
-import numpy as np
 import cv2 as cv2
-import matplotlib.pyplot as plt
+import rad_sa_regionima as regioni
+import time
 """
 from mnist import MNIST
 mndata = MNIST('')
@@ -21,7 +21,7 @@ Get to 98.40% test accuracy after 20 epochs
 (there is *a lot* of margin for parameter tuning).
 2 seconds per epoch on a K520 GPU.
 '''
-
+"""
 #from __future__ import print_function
 import numpy as np
 np.random.seed(1337)  # for reproducibility
@@ -74,21 +74,25 @@ score = model.evaluate(X_test, Y_test,
                        show_accuracy=True, verbose=0)
 print('Test score:', score[0])
 print('Test accuracy:', score[1])
-
+"""
 
 
 cap = cv2.VideoCapture(0)
 while(True):
     # Uzima frejm po frejm
+    time.sleep(0.5)
     ret, frame = cap.read()
     # Operacije nad frejmom
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-    bin_frame = cv2.adaptiveThreshold(gray_frame, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 45, 12)
-    img, contours, hierarchy = cv2.findContours(bin_frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    img = frame.copy()
-    cv2.drawContours(img, contours, -1, (0,0,255), 1)
-    cv2.imshow('Live HW Determinant Solver',img)
-    cv2.imshow('Proba', frame)
+    bin_frame = cv2.adaptiveThreshold(gray_frame, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 25, 14)
+    cv2.imshow('Black and white', bin_frame)
+    cv2.imshow('Camera frame', frame)
+    #img, contours, hierarchy = cv2.findContours(bin_frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    im, contours = regioni.regioni_od_interesa(frame, bin_frame)
+    #cv2.drawContours(img, contours, -1, (0,0,255), 1)
+    #cv2.imshow('Live HW Determinant Solver',img)
+    cv2.imshow('Image', frame)
+    cv2.imshow('Grayscale', gray_frame)
     key = cv2.waitKey(1)
     if key & 0xFF == 27:
         break
