@@ -158,9 +158,9 @@ def rotate_contour(contour, frame_bin):
 def izaberi_konture(contour_borders):
     pogodne_konture = []
     ### PRVO NADJEMO USPRAVNE LINIJE
-    for contour in contour_borders:
-        x,y,w,h = cv2.boundingRect(contour) #koordinate i velicina granicnog pravougaonika
-        area = cv2.contourArea(contour)
+    #for contour in contour_borders:
+    #    x,y,w,h = cv2.boundingRect(contour) #koordinate i velicina granicnog pravougaonika
+    #    area = cv2.contourArea(contour)
         
     
     for contour in contour_borders:
@@ -168,18 +168,18 @@ def izaberi_konture(contour_borders):
         area = cv2.contourArea(contour)
         
         # PRONACI REGIONE KOJI PREDSTAVLJAJU USPRAVNE LINIJE DETERMINANTE
-        if (h/w > 10):
+        if (h/w > 5):
             pogodne_konture.append(contour)
             print "USPRAVNA LAJNA"
             
         # PRONACI REGIONE IZMEDJU LINIJA 
         
         # ZA SLOVA
-        elif area > 20 and area < 10000 and h < 400 and h > 10 and w > 10 and w<400:
-            pogodne_konture.append(contour)
+        #elif area > 20 and area < 10000 and h < 400 and h > 10 and w > 10 and w<400:
+        #    pogodne_konture.append(contour)
         # ZA GRANICE DETERMINANTE
-        elif area > 10 and h>50 and h< 400 and w<20:
-            pogodne_konture.append(contour)
+        #elif area > 10 and h>50 and h< 400 and w<20:
+        #    pogodne_konture.append(contour)
     pogodne_konture = merge_regions(pogodne_konture)
     return pogodne_konture
     """
