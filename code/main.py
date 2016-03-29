@@ -8,6 +8,9 @@ This is a temporary script file.
 import cv2 as cv2
 import rad_sa_regionima as regioni
 import time
+import matplotlib.pyplot as plt
+import matplotlib.pylab as pylab
+pylab.rcParams['figure.figsize'] = 6, 4
 """
 from mnist import MNIST
 mndata = MNIST('')
@@ -78,24 +81,27 @@ print('Test accuracy:', score[1])
 
 
 cap = cv2.VideoCapture(0)
+prolaz = 1
 while(True):
+    print "\n\nPROLAZ BROJ ", prolaz, "\n\n"
     # Uzima frejm po frejm
-    time.sleep(0.5)
+    time.sleep(2)
     ret, frame = cap.read()
     # Operacije nad frejmom
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
     bin_frame = cv2.adaptiveThreshold(gray_frame, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 25, 14)
     cv2.imshow('Black and white', bin_frame)
-    cv2.imshow('Camera frame', frame)
+    #cv2.imshow('Camera frame', frame)
     #img, contours, hierarchy = cv2.findContours(bin_frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    im, contours = regioni.regioni_od_interesa(frame, bin_frame)
+    im, contours = regioni.regioni_od_interesa(frame, bin_frame, prolaz)
     #cv2.drawContours(img, contours, -1, (0,0,255), 1)
     #cv2.imshow('Live HW Determinant Solver',img)
     cv2.imshow('Image', frame)
-    cv2.imshow('Grayscale', gray_frame)
+    #cv2.imshow('Grayscale', gray_frame)
     key = cv2.waitKey(1)
-    if key & 0xFF == 27:
+    if key & 0xFF == 27:  # KAD SE STISNE ESC IZLAZAK IZ APLIKACIJE
         break
+    prolaz = prolaz + 1
 
 # Kada je sve gotovo, oslobodi izvor
 cap.release()
