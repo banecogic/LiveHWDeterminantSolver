@@ -11,20 +11,14 @@ import time
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
 pylab.rcParams['figure.figsize'] = 6, 4
-"""
-from mnist import MNIST
-mndata = MNIST('')
-ims, labels = mndata.load_testing()
-print ims
-"""
 
 
+"""
 '''Train a simple deep NN on the MNIST dataset.
 Get to 98.40% test accuracy after 20 epochs
 (there is *a lot* of margin for parameter tuning).
 2 seconds per epoch on a K520 GPU.
 '''
-"""
 #from __future__ import print_function
 import numpy as np
 np.random.seed(1337)  # for reproducibility
@@ -80,7 +74,9 @@ print('Test accuracy:', score[1])
 """
 
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
+cap.release()
+cap.open(0)
 prolaz = 1
 while(True):
     print "\n\nPROLAZ BROJ ", prolaz, "\n\n"
@@ -93,7 +89,7 @@ while(True):
     cv2.imshow('Black and white', bin_frame)
     #cv2.imshow('Camera frame', frame)
     #img, contours, hierarchy = cv2.findContours(bin_frame, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    im, contours = regioni.regioni_od_interesa(frame, bin_frame, prolaz)
+    im, contours = regioni.regioni_od_interesa(frame, bin_frame, prolaz, model)
     #cv2.drawContours(img, contours, -1, (0,0,255), 1)
     #cv2.imshow('Live HW Determinant Solver',img)
     cv2.imshow('Image', frame)

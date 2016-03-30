@@ -79,10 +79,13 @@ def nadji_konture_determinante(pogodne_konture, frame_bin, frame, prolaz):
     rotirane_konture = []
     distances_x = []
     distances_y = []
+    index = 0
     for contour in sortirane_rotirane_konture:
         xt,yt,h,w = cv2.boundingRect(contour)
         rectCont = cv2.minAreaRect(contour)
         centerCont, sizeCont, angleCont = rectCont
+        ccx, ccy = centerCont
+        print "Centar konture broj", index, " : X=", ccx," Y=", ccy
         region_points = []
         for i in range (xt,xt+h):
             for j in range(yt,yt+w):
@@ -107,14 +110,15 @@ def nadji_konture_determinante(pogodne_konture, frame_bin, frame, prolaz):
         rectRotatedCont = cv2.minAreaRect(region_points_rotated)
         centerRotatedCont, sizeRotatedCont, angleRotatedCont = rectRotatedCont
         crcx, crcy = centerRotatedCont
-        distances_x.append(crcx-cdx)
-        distances_y.append(crcy-cdy)
+        print "Rotirana oko centra determinante : X=", crcx," Y=", crcy
+        distances_x.append(ccx-cdx)
+        distances_y.append(ccy-cdy)
         boxRotatedCont = cv2.boxPoints(rectRotatedCont)
-        print "Temena rotiranog regiona: ", boxRotatedCont
         boxRotatedCont = np.int0(boxRotatedCont)
         cv2.drawContours(frame, [boxRotatedCont], 0, (255,255,255), 2)
         rotirane_konture.append(region_points_rotated)
-        rotirane_konture_mapa_po_x[int(crcx)] = region_points_rotated
+        rotirane_konture_mapa_po_x[int(ccx)] = region_points_rotated
+        index += 1
     sortirane_rotirane_mapa_po_x = collections.OrderedDict(sorted(rotirane_konture_mapa_po_x.items()))
     sortirane_rotirane_konture = np.array(sortirane_rotirane_mapa_po_x.values())
     print "Broj kontura u determinanti = ", len(konture_unutar_determinante), " sortiranih treba isto? = ", len(sortirane_rotirane_konture)
@@ -127,16 +131,52 @@ def nadji_konture_determinante(pogodne_konture, frame_bin, frame, prolaz):
     k_means_x = KMeans(n_clusters=n_clusters, max_iter=1000)
     distances_x = np.array(distances_x).reshape(len(distances_x), 1)
     k_means_x.fit(distances_x)
-    print "ZA X DIMENZIJU: KMeans labels_ : ", k_means_x.labels_
-    print "ZA X DIMENZIJU: KMeans cluster_centers_ :", k_means_x.cluster_centers_
     
     # KMeans za razdvajanje kolona
     print "Distance po y od centra determinante : ", distances_y
     k_means_y = KMeans(n_clusters=n_clusters, max_iter=1000)
     distances_y = np.array(distances_y).reshape(len(distances_y), 1)
     k_means_y.fit(distances_y)
+    regioni = smestiElementeUMatricu(sortirane_rotirane_konture, k_means_x, k_means_y, frame_bin)
+    return np.array(regioni, np.float32)
+
+def smestiElementeUMatricu(konture, k_means_x, k_means_y, frame_bin):
+    print "ZA X DIMENZIJU: KMeans labels_ : ", k_means_x.labels_
+    print "ZA X DIMENZIJU: KMeans cluster_centers_ :", k_means_x.cluster_centers_
+    sortirani_indexi_x = [i[0] for i in sorted(enumerate(k_means_x.cluster_centers_), key=lambda x:x[1])]
+    print "SORTIRANI INDEKSI OD KMeans cluster_centers_ (DIM X) : ", sortirani_indexi_x
     print "ZA Y DIMENZIJU: KMeans labels_ : ", k_means_y.labels_
     print "ZA Y DIMENZIJU: KMeans cluster_centers_ :", k_means_y.cluster_centers_
+    sortirani_indexi_y = [i[0] for i in sorted(enumerate(k_means_y.cluster_centers_), key=lambda x:x[1])]
+    print "SORTIRANI INDEKSI OD KMeans cluster_centers_ (DIM Y) : ", sortirani_indexi_y
+    
+    matrica = np.ndarray((max(k_means_x.labels_)+1, max(k_means_x.labels_)+1), dtype=np.ndarray)
+    preshape = matrica.shape
+    #print "MATRICA PRE SETOVANJA ELEMENATA : ", matrica
+    for i, index_x in enumerate(sortirani_indexi_x):
+        for j, index_y in enumerate(sortirani_indexi_y):
+            for x, pripadnost_x in enumerate(k_means_x.labels_):
+                for y, pripadnost_y in enumerate(k_means_y.labels_):
+                    if (index_x == pripadnost_x) & (x == y):
+                        matrica[i][j] = konture[x]
+    #print "MATRICA POSLE SETOVANJA ELEMENATA : ", matrica
+    print "DIMENZIJA PRE ", preshape,", POSLE SETOVANJA ELEMENATA : ", matrica.shape
+    return vratiKaoNizZaMrezu(matrica, frame_bin)
+    
+def vratiKaoNizZaMrezu(matrica, frame_bin):
+    regioni = []
+    for i in range(0,2):
+        for j in range(0,2):
+            x, y, w, h = cv2.boundingRect(matrica[i][j])
+            region = frame_bin[y:y+h+1, x:x+w+1]
+            regioni.append(cv2.resize(region, (28,28), interpolation = cv2.INTER_LANCZOS4))
+    spremni_za_mrezu = []
+    for region in regioni:
+        scale = (region/255)
+        scale = scale.flatten()
+        spremni_za_mrezu.append(scale)
+    print "TREBA NIZ OD 4 NIZA OD 700 kusur tacaka : ", np.asarray(spremni_za_mrezu).shape
+    return spremni_za_mrezu
     
 def merge_intersected(contours):
     ret_val = []
@@ -276,7 +316,7 @@ def crtaj_konture(contours, frame, frame_bin):
         cv2.drawContours(frame, contour, -1, (0,0,255), 2)
         cv2.rectangle(frame,(x,y),(x+w,y+h),(0,255,0),2)
 
-def regioni_od_interesa(frame, frame_bin, prolaz):
+def regioni_od_interesa(frame, frame_bin, prolaz, model):
     img, contour_borders, hierarchy = cv2.findContours(frame_bin.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     print "Prepoznate konture od cv2 biblioteke: ", len(contour_borders)
     #iscrtajIzKontureSliku(contour_borders, img)
@@ -291,13 +331,33 @@ def regioni_od_interesa(frame, frame_bin, prolaz):
     #contours2, contour_angles, contour_centers, contour_sizes = centri_uglovi_velicine(contours, frame_bin)
     #rotated_contours = []
     #rotated_contours = rotate_regions(contours2, contour_angles, contour_centers, contour_sizes)
-    determinant_contours = nadji_konture_determinante(spojene_presecne_izabrane_konture, frame_bin, frame, prolaz)
+    regioni_za_mrezu = nadji_konture_determinante(spojene_presecne_izabrane_konture, frame_bin, frame, prolaz)
+    print "REGIONI ZA MREZU: ", regioni_za_mrezu[0]
+    #array_za_mrezu = np.asarray(regioni_za_mrezu, np.float32)
+    #print "NIZ ZA MREZU: ", array_za_mrezu
+    print "SHAPE PRE MREZE: ", regioni_za_mrezu.shape
+    rezultat = model.predict(regioni_za_mrezu)
+    #rezultat = model.predict(regioni_za_mrezu)
+    alphabet = [0,1,2,3,4,5,6,7,8,9]
+    print display_result(rezultat, alphabet)
     #crtaj_konture(rotated_contours, frame, frame_bin)
     
     #sorted_regions_dic = collections.OrderedDict(sorted(regions_dic.items()))
     #sorted_regions = sorted_regions_dic.values()
     return frame, sorted_regions
-    
+
+def winner(output): # output je vektor sa izlaza neuronske mreze
+    '''pronaći i vratiti indeks neurona koji je najviše pobuđen'''
+    return max(enumerate(output), key=lambda x: x[1])[0]
+
+def display_result(outputs, alphabet):
+    '''za svaki rezultat pronaći indeks pobedničkog
+        regiona koji ujedno predstavlja i indeks u alfabetu.
+        Dodati karakter iz alfabet u result'''
+    result = []
+    for output in outputs:
+        result.append(alphabet[winner(output)])
+    return result
 # Rotiranje regiona
 def rotate_regions(contours,angles,centers,sizes):
     '''Funkcija koja vrši rotiranje regiona oko njihovih centralnih tačaka
