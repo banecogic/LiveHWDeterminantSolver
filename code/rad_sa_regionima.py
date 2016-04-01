@@ -119,8 +119,8 @@ def nadji_konture_determinante(pogodne_konture, frame_bin, frame, prolaz):
         rotirane_konture.append(region_points_rotated)
         rotirane_konture_mapa_po_x[int(ccx)] = region_points_rotated
         index += 1
-    sortirane_rotirane_mapa_po_x = collections.OrderedDict(sorted(rotirane_konture_mapa_po_x.items()))
-    sortirane_rotirane_konture = np.array(sortirane_rotirane_mapa_po_x.values())
+    #sortirane_rotirane_mapa_po_x = collections.OrderedDict(sorted(rotirane_konture_mapa_po_x.items()))
+    #sortirane_rotirane_konture = np.array(sortirane_rotirane_mapa_po_x.values())
     print "Broj kontura u determinanti = ", len(konture_unutar_determinante), " sortiranih treba isto? = ", len(sortirane_rotirane_konture)
     
     # KMeans razdvajanje brojeva po pripadnosti vrsti i koloni
@@ -137,10 +137,10 @@ def nadji_konture_determinante(pogodne_konture, frame_bin, frame, prolaz):
     k_means_y = KMeans(n_clusters=n_clusters, max_iter=1000)
     distances_y = np.array(distances_y).reshape(len(distances_y), 1)
     k_means_y.fit(distances_y)
-    regioni = smestiElementeUMatricu(sortirane_rotirane_konture, k_means_x, k_means_y, frame_bin)
+    regioni = smestiElementeUMatricu(sortirane_rotirane_konture, k_means_x, k_means_y, frame_bin, prolaz)
     return np.array(regioni, np.float32)
 
-def smestiElementeUMatricu(konture, k_means_x, k_means_y, frame_bin):
+def smestiElementeUMatricu(konture, k_means_x, k_means_y, frame_bin, prolaz):
     print "ZA X DIMENZIJU: KMeans labels_ : ", k_means_x.labels_
     print "ZA X DIMENZIJU: KMeans cluster_centers_ :", k_means_x.cluster_centers_
     sortirani_indexi_x = [i[0] for i in sorted(enumerate(k_means_x.cluster_centers_), key=lambda x:x[1])]
@@ -153,23 +153,50 @@ def smestiElementeUMatricu(konture, k_means_x, k_means_y, frame_bin):
     matrica = np.ndarray((max(k_means_x.labels_)+1, max(k_means_x.labels_)+1), dtype=np.ndarray)
     preshape = matrica.shape
     #print "MATRICA PRE SETOVANJA ELEMENATA : ", matrica
+    niz = np.ndarray((4,), dtype=np.ndarray)
     for i, index_x in enumerate(sortirani_indexi_x):
         for j, index_y in enumerate(sortirani_indexi_y):
             for x, pripadnost_x in enumerate(k_means_x.labels_):
                 for y, pripadnost_y in enumerate(k_means_y.labels_):
-                    if (index_x == pripadnost_x) & (x == y):
-                        matrica[i][j] = konture[x]
+                    if (index_x == pripadnost_x) and (index_y == pripadnost_y) and (x==y):
+                        #print "index_x = ", index_x, "
+                        print "I i J indeksi koje smesta u matricu:   ", i, "   ", j
+                        print "index_x i index_y:   ", index_x, "   ", index_y
+                        #matrica[i][j] = konture[x]
+                        niz[2*j+i] = konture[x]
+    
     #print "MATRICA POSLE SETOVANJA ELEMENATA : ", matrica
     print "DIMENZIJA PRE ", preshape,", POSLE SETOVANJA ELEMENATA : ", matrica.shape
-    return vratiKaoNizZaMrezu(matrica, frame_bin)
+    return vratiKaoNizZaMrezu(niz, frame_bin, prolaz)
     
-def vratiKaoNizZaMrezu(matrica, frame_bin):
+def vratiKaoNizZaMrezu(niz, frame_bin, prolaz):
     regioni = []
-    for i in range(0,2):
-        for j in range(0,2):
-            x, y, w, h = cv2.boundingRect(matrica[i][j])
-            region = frame_bin[y:y+h+1, x:x+w+1]
-            regioni.append(cv2.resize(region, (28,28), interpolation = cv2.INTER_LANCZOS4))
+    print "RANGE 0, 1 : ", range(0,1)
+    print "RANGE 0, 2 : ", range(0,2)
+    #for i in range(0,2):
+    for j in range(0,4):
+        #x, y, w, h = cv2.boundingRect(matrica[i][j])
+        x, y, w, h = cv2.boundingRect(niz[j])
+        print "H : ------------------- ", h
+        print "W : ------------------- ", w
+        if w != 0:
+            odnos_hw = float (float(h)/w)
+        else:
+            odnos_hw = 1
+        dodaj_w = 0
+        if odnos_hw > 1.5:
+            dodaj_w = int(h*0.3)
+        print "ODNOS H I W", odnos_hw
+        print "DODAJ W", dodaj_w
+        region = frame_bin[y:y+h+1, x-dodaj_w/2:x+dodaj_w/2+w+1]
+        region = cv2.resize(region, (18,18), interpolation = cv2.INTER_AREA)
+        region_with_offset = np.zeros((28,28), dtype=int)
+        region_with_offset[5:23, 5:23] = region
+        regioni.append(region_with_offset)
+        if prolaz <= 3:
+            fit = plt.figure()
+            plt.imshow(regioni[-1], 'gray')
+            fit.show()
     spremni_za_mrezu = []
     for region in regioni:
         scale = (region/255)
@@ -210,7 +237,7 @@ def rotate_contour(contour, frame_bin):
     center, size, angle = cv2.minAreaRect(contour)
     xt,yt,h,w = cv2.boundingRect(contour)
     region_points = []
-    for i in range (xt,xt+h):
+    for i in range (xt,xt+h): 
         for j in range(yt,yt+w):
             dist = cv2.pointPolygonTest(contour,(i,j),False)
             if dist>=0 and frame_bin[j,i]==255: # da li se tacka nalazi unutar konture?
@@ -332,14 +359,23 @@ def regioni_od_interesa(frame, frame_bin, prolaz, model):
     #rotated_contours = []
     #rotated_contours = rotate_regions(contours2, contour_angles, contour_centers, contour_sizes)
     regioni_za_mrezu = nadji_konture_determinante(spojene_presecne_izabrane_konture, frame_bin, frame, prolaz)
-    print "REGIONI ZA MREZU: ", regioni_za_mrezu[0]
     #array_za_mrezu = np.asarray(regioni_za_mrezu, np.float32)
     #print "NIZ ZA MREZU: ", array_za_mrezu
-    print "SHAPE PRE MREZE: ", regioni_za_mrezu.shape
+    #print "SHAPE PRE MREZE: ", regioni_za_mrezu.shape
+    if regioni_za_mrezu == None:
+        return "", ""
     rezultat = model.predict(regioni_za_mrezu)
     #rezultat = model.predict(regioni_za_mrezu)
     alphabet = [0,1,2,3,4,5,6,7,8,9]
     print display_result(rezultat, alphabet)
+    rezultat = display_result(rezultat, alphabet)
+    print "Prepoznati brojevi: ---- ", rezultat
+    rezarray = np.asarray(rezultat)
+    print "Prepoznati brojevi kao array: ---- ", rezarray
+    #matrica = np.ndarray(shape=(2,2), buffer=np.asarray(rezultat))
+    matrica = rezarray.reshape(2,2)
+    print "MATRICAAAA: ---------------- ", matrica
+    print "DETERMINANTA: -------------- ", np.linalg.det(matrica)
     #crtaj_konture(rotated_contours, frame, frame_bin)
     
     #sorted_regions_dic = collections.OrderedDict(sorted(regions_dic.items()))
@@ -355,7 +391,10 @@ def display_result(outputs, alphabet):
         regiona koji ujedno predstavlja i indeks u alfabetu.
         Dodati karakter iz alfabet u result'''
     result = []
-    for output in outputs:
+    for j, output in enumerate(outputs):
+        print "Rezultat za ", j, ". broj",
+        for i, pojedin in enumerate(output):       
+            print "\tZa ", i, " : ", round(pojedin, 3)
         result.append(alphabet[winner(output)])
     return result
 # Rotiranje regiona
